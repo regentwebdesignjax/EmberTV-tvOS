@@ -45,7 +45,7 @@ struct LoginView: View {
                             .font(EmberTheme.titleFont(44))
                             .foregroundColor(.white)
 
-                        Text("Use the same email and password you use on EmberStreaming.app.")
+                        Text("Use your EmberTV email and password to sign in.")
                             .font(EmberTheme.bodyFont(22))
                             .foregroundColor(EmberTheme.textSecondary)
                             .multilineTextAlignment(.center)
@@ -65,7 +65,8 @@ struct LoginView: View {
                                 .keyboardType(.emailAddress)
                                 .textInputAutocapitalization(.never)
                                 .autocorrectionDisabled(true)
-                                .font(EmberTheme.bodyFont(22))
+                                // UPDATED: Increased font size to 32
+                                .font(EmberTheme.bodyFont(32))
                                 .textFieldStyle(.plain)                 // IMPORTANT on tvOS
                                 .foregroundStyle(emailTextColor)        // IMPORTANT on tvOS
                                 .tint(EmberTheme.primary)               // cursor / selection color
@@ -105,7 +106,8 @@ struct LoginView: View {
 
                             SecureField("Password", text: $password)
                                 .textContentType(.password)
-                                .font(EmberTheme.bodyFont(22))
+                                // UPDATED: Increased font size to 32
+                                .font(EmberTheme.bodyFont(32))
                                 .textFieldStyle(.plain)                   // IMPORTANT on tvOS
                                 .foregroundStyle(passwordTextColor)       // IMPORTANT on tvOS
                                 .tint(EmberTheme.primary)
@@ -233,4 +235,3 @@ struct EmberLoginPrimaryButtonStyle: ButtonStyle {
         }
     }
 }
-
