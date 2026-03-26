@@ -1,226 +1,182 @@
 import SwiftUI
 
-// MARK: - Ember Capsule Button Style (outline → filled on focus)
-
-struct EmberCapsuleButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        EmberCapsuleButton(configuration: configuration)
-    }
-
-    private struct EmberCapsuleButton: View {
-        @Environment(\.isFocused) private var isFocused: Bool
-        let configuration: Configuration
-
-        var body: some View {
-            configuration.label
-                .font(EmberTheme.bodySemibold(22))
-                .padding(.horizontal, 28)
-                .padding(.vertical, 10)
-                .background(
-                    Capsule()
-                        .fill(
-                            isFocused
-                            ? EmberTheme.primary
-                            : Color.clear
-                        )
-                )
-                .overlay(
-                    Capsule()
-                        .strokeBorder(
-                            EmberTheme.primary,
-                            lineWidth: 2
-                        )
-                )
-                .foregroundColor(.white)
-                .scaleEffect(isFocused || configuration.isPressed ? 1.06 : 1.0)
-                .shadow(
-                    color: isFocused ? EmberTheme.primary.opacity(0.7) : .clear,
-                    radius: 14, x: 0, y: 0
-                )
-                .animation(.easeOut(duration: 0.18), value: isFocused)
-                .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
-                .focusEffectDisabled(true)
-        }
-    }
-}
-
-// MARK: - MyRentalsView
-
 struct MyRentalsView: View {
-    @EnvironmentObject var apiClient: EmberAPIClient
-
     @State private var rentals: [Rental] = []
-    @State private var isLoading = false
-    @State private var errorMessage: String?
+    @State private var isLoading = true
+    
+    @AppStorage("EmberAuthToken") private var authToken: String = ""
 
-    private let columns: [GridItem] = [
-        GridItem(.fixed(260), spacing: 60),
-        GridItem(.fixed(260), spacing: 60),
-        GridItem(.fixed(260), spacing: 60),
-        GridItem(.fixed(260), spacing: 60)
+    // NEW: Tracks which movie the user is currently focused on
+    @FocusState private var focusedRentalID: String?
+
+    private let columns = [
+        GridItem(.adaptive(minimum: 250), spacing: 60)
     ]
 
     var body: some View {
         NavigationStack {
             ZStack {
-                EmberTheme.background
-                    .ignoresSafeArea()
-
-                VStack(alignment: .leading, spacing: 60) {
-
-                    // Header
-                    HStack {
-                        Image("ember-tv-logo")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(height: 60)
-                            .padding(.leading, 80)
-
-                        Spacer()
-
-                        VStack(spacing: 4) {
-                            Text("My Rentals")
-                                .font(EmberTheme.titleFont(40))
-                                .foregroundColor(.white)
-
-                            Text("Your active 24-hour rentals, ready to watch.")
-                                .font(EmberTheme.bodyFont(18))
-                                .foregroundColor(EmberTheme.textSecondary)
-                        }
-
-                        Spacer()
-
-                        HStack(spacing: 16) {
-                            Button {
-                                Task { await reload() }
-                            } label: {
-                                Text("Refresh")
+                // MARK: - LAYER 1: Dynamic Cinematic Background
+                ZStack {
+                    // Find the currently focused rental
+                    if let focusedRental = rentals.first(where: { $0.film.id == focusedRentalID }),
+                       let url = focusedRental.film.posterURL {
+                        
+                        GeometryReader { geo in
+                            AsyncImage(url: url) { phase in
+                                if let image = phase.image {
+                                    image
+                                        .resizable()
+                                        .scaledToFill()
+                                        .frame(width: geo.size.width, height: geo.size.height)
+                                        .transition(.opacity) // Smooth crossfade
+                                } else {
+                                    EmberTheme.background
+                                }
                             }
-                            .buttonStyle(EmberCapsuleButtonStyle())
-
-                            Button {
-                                logout()
-                            } label: {
-                                Text("Log Out")
-                            }
-                            .buttonStyle(EmberCapsuleButtonStyle())
+                            // The .id modifier forces SwiftUI to recreate the view when the URL changes, triggering the transition
+                            .id(url)
                         }
-                        .padding(.trailing, 80)
+                    } else {
+                        EmberTheme.background
                     }
-                    .padding(.top, 60)
+                }
+                .blur(radius: 80) // Heavy blur so it's just ambient color
+                .overlay(
+                    Rectangle()
+                        .fill(
+                            LinearGradient(
+                                gradient: Gradient(colors: [
+                                    EmberTheme.background.opacity(0.5),
+                                    EmberTheme.background.opacity(0.95) // Darker at the bottom for readability
+                                ]),
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                )
+                .ignoresSafeArea()
+                .animation(.easeInOut(duration: 0.6), value: focusedRentalID) // The crossfade speed
+
+                // MARK: - LAYER 2: UI Content
+                VStack(spacing: 0) {
+                    
+                    // Premium Header (Aligned Top-Center)
+                    ZStack {
+                        // Center Title
+                        Text("My Rentals")
+                            .font(EmberTheme.titleFont(52))
+                            .foregroundColor(.white)
+                        
+                        // Left Logo & Right Buttons
+                        HStack(alignment: .center) {
+                            Image("ember-tv-logo")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(height: 48)
+                            
+                            Spacer()
+                            
+                            HStack(spacing: 24) {
+                                Button {
+                                    loadRentals()
+                                } label: {
+                                    Label("Refresh", systemImage: "arrow.clockwise")
+                                        .font(EmberTheme.bodySemibold(20))
+                                }
+                                
+                                Button {
+                                    logout()
+                                } label: {
+                                    Label("Log Out", systemImage: "rectangle.portrait.and.arrow.right")
+                                        .font(EmberTheme.bodySemibold(20))
+                                }
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 60)
+                    .padding(.top, 40)
+                    .padding(.bottom, 20)
                     .focusSection()
 
-                    // Main content
-                    content
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    // Content Area
+                    if isLoading {
+                        Spacer()
+                        ProgressView("Loading your library...")
+                            .controlSize(.large)
+                        Spacer()
+                    } else if rentals.isEmpty {
+                        Spacer()
+                        VStack(spacing: 20) {
+                            Image(systemName: "film.stack")
+                                .font(.system(size: 80))
+                                .foregroundColor(.white.opacity(0.2))
+                            Text("Your library is empty")
+                                .font(EmberTheme.headingFont(32))
+                                .foregroundColor(EmberTheme.textPrimary)
+                            Text("Rentals you purchase on the web will appear here.")
+                                .font(EmberTheme.bodyFont(24))
+                                .foregroundColor(EmberTheme.textSecondary)
+                        }
+                        Spacer()
+                    } else {
+                        ScrollView {
+                            LazyVGrid(columns: columns, spacing: 80) {
+                                ForEach(rentals, id: \.film.id) { rental in
+                                    NavigationLink(value: rental) {
+                                        RentalPosterCard(rental: rental)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .focusEffectDisabled(true)
+                                    // NEW: Tells the Focus Engine to update our tracking variable when this card is highlighted
+                                    .focused($focusedRentalID, equals: rental.film.id)
+                                }
+                            }
+                            .padding(.horizontal, 60)
+                            .padding(.top, 40)
+                            .padding(.bottom, 100)
+                        }
+                        .focusSection()
+                    }
                 }
             }
             .navigationDestination(for: Rental.self) { rental in
                 RentalDetailView(rental: rental)
             }
-            .task {
-                await reload()
+            .onAppear {
+                loadRentals()
             }
         }
     }
 
-    // MARK: - Content
-
-    @ViewBuilder
-    private var content: some View {
-        if isLoading && rentals.isEmpty {
-            Spacer()
-            ProgressView("Loading your rentals…")
-                .font(EmberTheme.bodyFont(24))
-                .foregroundColor(.white.opacity(0.8))
-            Spacer()
-        } else if let message = errorMessage, rentals.isEmpty {
-            Spacer()
-            VStack(spacing: 16) {
-                Text("Something went wrong")
-                    .font(EmberTheme.headingFont(32))
-                    .foregroundColor(.white)
-
-                Text(message)
-                    .font(EmberTheme.bodyFont(20))
-                    .foregroundColor(EmberTheme.textSecondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 800)
-
-                Button {
-                    Task { await reload() }
-                } label: {
-                    Text("Try Again")
-                        .font(EmberTheme.bodySemibold(22))
-                        .padding(.horizontal, 32)
-                        .padding(.vertical, 14)
-                        .background(
-                            RoundedRectangle(cornerRadius: 28, style: .continuous)
-                                .fill(EmberTheme.primary)
-                        )
-                        .foregroundColor(.white)
-                }
-                .buttonStyle(.plain)
-            }
-            Spacer()
-        } else if rentals.isEmpty {
-            Spacer()
-            VStack(spacing: 16) {
-                Text("No Active Rentals")
-                    .font(EmberTheme.headingFont(32))
-                    .foregroundColor(.white)
-
-                Text("When you rent a film on Ember, it will appear here and stay active for 24 hours.")
-                    .font(EmberTheme.bodyFont(20))
-                    .foregroundColor(EmberTheme.textSecondary)
-                    .frame(maxWidth: 900)
-                    .multilineTextAlignment(.center)
-            }
-            Spacer()
-        } else {
-            ScrollView {
-                LazyVGrid(columns: columns, spacing: 60) {
-                    ForEach(Array(rentals.enumerated()), id: \.offset) { _, rental in
-                        NavigationLink(value: rental) {
-                            RentalPosterCard(rental: rental)
-                        }
+    // MARK: - Actions
+    private func loadRentals() {
+        isLoading = true
+        Task {
+            do {
+                let fetchedRentals = try await EmberAPIClient.shared.fetchMyRentals()
+                
+                await MainActor.run {
+                    self.rentals = fetchedRentals
+                    self.isLoading = false
+                    
+                    // Optional: Set the background to the first movie right when they load in
+                    if let first = fetchedRentals.first {
+                        self.focusedRentalID = first.film.id
                     }
                 }
-                .padding(.horizontal, 120)
-                .padding(.top, 20)
-                .padding(.bottom, 120)
-            }
-            .focusSection()
-        }
-    }
-
-    // MARK: - Data
-
-    private func reload() async {
-        await MainActor.run {
-            isLoading = true
-            errorMessage = nil
-        }
-
-        do {
-            let fetched = try await apiClient.fetchMyRentals()
-            await MainActor.run {
-                withAnimation(.easeInOut(duration: 0.25)) {
-                    rentals = fetched
+            } catch {
+                print("Failed to fetch rentals: \(error.localizedDescription)")
+                await MainActor.run {
+                    self.isLoading = false
                 }
-                isLoading = false
-            }
-        } catch {
-            await MainActor.run {
-                errorMessage = "We couldn’t load your rentals. Please try again."
-                isLoading = false
             }
         }
     }
-
+    
     private func logout() {
-        apiClient.logout()
-        rentals = []
+        authToken = ""
+        EmberAPIClient.shared.logout()
+        print("User logged out successfully.")
     }
 }
-

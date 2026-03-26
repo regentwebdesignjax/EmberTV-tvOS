@@ -1,237 +1,167 @@
 import SwiftUI
 
 struct LoginView: View {
-    @EnvironmentObject var api: EmberAPIClient
-
     @State private var email = ""
     @State private var password = ""
     @State private var isLoading = false
     @State private var errorMessage: String?
-
-    enum LoginField: Hashable {
-        case email
-        case password
-    }
-
-    @FocusState private var focusedField: LoginField?
-
-    // MARK: - Computed colors (keeps text readable + visible)
-    private var emailTextColor: Color {
-        if focusedField == .email { return .white }
-        return email.isEmpty ? .white : EmberTheme.primary
-    }
-
-    private var passwordTextColor: Color {
-        if focusedField == .password { return .white }
-        return password.isEmpty ? .white : EmberTheme.primary
-    }
-
+    
+    // This watches the token. When the API client updates it, the app will automatically route away from this screen.
+    @AppStorage("EmberAuthToken") private var authToken: String = ""
+    
     var body: some View {
         ZStack {
-            EmberTheme.background
-                .ignoresSafeArea()
-
-            VStack {
-                Spacer()
-
-                VStack(spacing: 40) {
+            // MARK: - LAYER 1: Premium Ambient Background
+            EmberTheme.background.ignoresSafeArea()
+            
+            // Subtle orange glow originating from the logo side
+            RadialGradient(
+                gradient: Gradient(colors: [EmberTheme.primary.opacity(0.15), .clear]),
+                center: .leading,
+                startRadius: 100,
+                endRadius: 900
+            )
+            .ignoresSafeArea()
+            
+            // MARK: - LAYER 2: Split Screen Content
+            HStack(spacing: 0) {
+                
+                // LEFT COLUMN: Branding & Marketing
+                VStack(alignment: .leading, spacing: 32) {
                     Image("ember-tv-logo")
                         .resizable()
                         .scaledToFit()
-                        .frame(height: 80)
-
-                    VStack(spacing: 12) {
-                        Text("Sign in to EmberTV")
-                            .font(EmberTheme.titleFont(44))
-                            .foregroundColor(.white)
-
-                        Text("Use your EmberTV email and password to sign in.")
-                            .font(EmberTheme.bodyFont(22))
-                            .foregroundColor(EmberTheme.textSecondary)
-                            .multilineTextAlignment(.center)
-                            .frame(maxWidth: 900)
-                    }
-
-                    VStack(spacing: 24) {
-
-                        // Email
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Email")
-                                .font(EmberTheme.bodyFont(20))
-                                .foregroundColor(EmberTheme.textSecondary)
-
-                            TextField("name@example.com", text: $email)
-                                .textContentType(.emailAddress)
-                                .keyboardType(.emailAddress)
-                                .textInputAutocapitalization(.never)
-                                .autocorrectionDisabled(true)
-                                // UPDATED: Increased font size to 32
-                                .font(EmberTheme.bodyFont(32))
-                                .textFieldStyle(.plain)                 // IMPORTANT on tvOS
-                                .foregroundStyle(emailTextColor)        // IMPORTANT on tvOS
-                                .tint(EmberTheme.primary)               // cursor / selection color
-                                .submitLabel(.done)
-                                .focused($focusedField, equals: .email)
-                                .onSubmit { focusedField = .password }  // go to next field
-                                .padding(.horizontal, 20)
-                                .padding(.vertical, 14)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                        .fill(Color.white.opacity(0.06))
-                                )
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                        .stroke(
-                                            focusedField == .email
-                                                ? EmberTheme.primary.opacity(0.95)
-                                                : Color.white.opacity(0.18),
-                                            lineWidth: focusedField == .email ? 3 : 1
-                                        )
-                                        .shadow(
-                                            color: focusedField == .email
-                                                ? EmberTheme.primary.opacity(0.70)
-                                                : .clear,
-                                            radius: focusedField == .email ? 18 : 0,
-                                            x: 0, y: 0
-                                        )
-                                )
-                                .focusEffectDisabled(true)
-                        }
-
-                        // Password
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Password")
-                                .font(EmberTheme.bodyFont(20))
-                                .foregroundColor(EmberTheme.textSecondary)
-
-                            SecureField("Password", text: $password)
-                                .textContentType(.password)
-                                // UPDATED: Increased font size to 32
-                                .font(EmberTheme.bodyFont(32))
-                                .textFieldStyle(.plain)                   // IMPORTANT on tvOS
-                                .foregroundStyle(passwordTextColor)       // IMPORTANT on tvOS
-                                .tint(EmberTheme.primary)
-                                .submitLabel(.done)
-                                .focused($focusedField, equals: .password)
-                                .onSubmit { focusedField = nil }          // close keyboard
-                                .padding(.horizontal, 20)
-                                .padding(.vertical, 14)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                        .fill(Color.white.opacity(0.06))
-                                )
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                        .stroke(
-                                            focusedField == .password
-                                                ? EmberTheme.primary.opacity(0.95)
-                                                : Color.white.opacity(0.18),
-                                            lineWidth: focusedField == .password ? 3 : 1
-                                        )
-                                        .shadow(
-                                            color: focusedField == .password
-                                                ? EmberTheme.primary.opacity(0.70)
-                                                : .clear,
-                                            radius: focusedField == .password ? 18 : 0,
-                                            x: 0, y: 0
-                                        )
-                                )
-                                .focusEffectDisabled(true)
-                        }
-
-                        if let errorMessage {
-                            Text(errorMessage)
-                                .font(EmberTheme.bodyFont(20))
-                                .foregroundColor(.red)
-                                .multilineTextAlignment(.center)
-                                .frame(maxWidth: 700)
-                        }
-
-                        Button {
-                            Task { await login() }
-                        } label: {
-                            HStack(spacing: 12) {
-                                if isLoading {
-                                    ProgressView()
-                                } else {
-                                    Image(systemName: "arrow.right.circle.fill")
-                                        .font(.system(size: 26, weight: .bold))
-                                }
-                                Text(isLoading ? "Signing In…" : "Sign In")
-                                    .font(EmberTheme.bodySemibold(24))
-                            }
-                        }
-                        .buttonStyle(EmberLoginPrimaryButtonStyle())
-                        .disabled(isLoading)
-                    }
-                    .padding(.horizontal, 40)
-                    .padding(.vertical, 40)
-                    .background(
-                        RoundedRectangle(cornerRadius: 32, style: .continuous)
-                            .fill(Color.white.opacity(0.03))
-                    )
-                    .frame(maxWidth: 900)
+                        .frame(height: 70)
+                    
+                    Text("The way family movie nights should be.")
+                        .font(EmberTheme.headingFont(48))
+                        .foregroundColor(.white)
+                        .lineSpacing(8)
+                    
+                    Text("Rent movies on the EmberTV web app and watch them instantly right here on your Apple TV.")
+                        .font(EmberTheme.bodyFont(24))
+                        .foregroundColor(EmberTheme.textSecondary)
+                        .padding(.trailing, 40)
                 }
-
-                Spacer()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.leading, 120)
+                
+                // RIGHT COLUMN: The Login Form
+                VStack(alignment: .leading, spacing: 40) {
+                    Text("Sign In")
+                        .font(EmberTheme.titleFont(64))
+                        .foregroundColor(.white)
+                    
+                    // Error Message Banner
+                    if let error = errorMessage {
+                        Text(error)
+                            .font(EmberTheme.bodySemibold(20))
+                            .foregroundColor(.white)
+                            .padding()
+                            .frame(maxWidth: 600, alignment: .leading)
+                            .background(Color.red.opacity(0.3))
+                            .cornerRadius(12)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color.red.opacity(0.6), lineWidth: 1)
+                            )
+                    }
+                    
+                    // Input Fields
+                    VStack(spacing: 24) {
+                        TextField("Email Address", text: $email)
+                            .textContentType(.emailAddress)
+                            .keyboardType(.emailAddress)
+                            .autocapitalization(.none)
+                        
+                        SecureField("Password", text: $password)
+                            .textContentType(.password)
+                    }
+                    .frame(width: 600)
+                    
+                    // Action Button
+                    Button {
+                        performLogin()
+                    } label: {
+                        HStack(spacing: 16) {
+                            if isLoading {
+                                ProgressView()
+                                    .tint(.white)
+                            }
+                            Text(isLoading ? "Signing In..." : "Log In")
+                        }
+                        .frame(maxWidth: .infinity) // Makes the button full width of the text fields
+                    }
+                    .buttonStyle(EmberLoginButtonStyle())
+                    .disabled(isLoading || email.isEmpty || password.isEmpty)
+                    .padding(.top, 20)
+                }
+                .frame(maxWidth: .infinity, alignment: .center)
             }
-            .padding(.horizontal, 80)
-        }
-        .onAppear {
-            focusedField = .email
         }
     }
-
-    private func login() async {
-        print("LoginView → Sign In tapped for email: \(email)")
-
-        guard !email.isEmpty, !password.isEmpty else {
-            errorMessage = "Please enter both email and password."
-            return
-        }
-
+    
+    // MARK: - Actions
+    private func performLogin() {
+        guard !email.isEmpty, !password.isEmpty else { return }
+        
         isLoading = true
         errorMessage = nil
-
-        do {
-            try await api.login(email: email, password: password)
-        } catch {
-            print("LoginView → login error: \(error)")
-            errorMessage = "Sign-in failed. Please check your email and password."
+        
+        Task {
+            do {
+                // Calls your existing EmberAPIClient logic
+                try await EmberAPIClient.shared.login(email: email, password: password)
+                
+                await MainActor.run {
+                    isLoading = false
+                    // Successful login will automatically save the token to UserDefaults inside the API client,
+                    // which updates the @AppStorage variable and dismisses this view.
+                }
+            } catch EmberAPIClient.LoginError.invalidCredentials {
+                await MainActor.run {
+                    isLoading = false
+                    errorMessage = "Invalid email or password. Please try again."
+                }
+            } catch {
+                await MainActor.run {
+                    isLoading = false
+                    errorMessage = "A connection error occurred. Please try again."
+                }
+            }
         }
-
-        isLoading = false
     }
 }
 
-// MARK: - Login button style
+// MARK: - Custom Button Style
+// Tailored slightly wider for the login form specifically
+private struct EmberLoginButtonStyle: ButtonStyle {
+    @Environment(\.isFocused) private var isFocused: Bool
 
-struct EmberLoginPrimaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
-        ButtonBody(configuration: configuration)
-    }
-
-    private struct ButtonBody: View {
-        @Environment(\.isFocused) private var isFocused: Bool
-        let configuration: Configuration
-
-        var body: some View {
-            configuration.label
-                .padding(.horizontal, 40)
-                .padding(.vertical, 16)
-                .background(
+        configuration.label
+            .font(EmberTheme.bodySemibold(24))
+            .padding(.vertical, 18)
+            .background(
+                ZStack {
                     Capsule()
-                        .fill(EmberTheme.primary)
-                )
-                .foregroundColor(.white)
-                .scaleEffect(isFocused || configuration.isPressed ? 1.06 : 1.0)
-                .shadow(
-                    color: isFocused ? EmberTheme.primary.opacity(0.7) : .clear,
-                    radius: 18, x: 0, y: 0
-                )
-                .animation(.easeOut(duration: 0.18), value: isFocused)
-                .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
-                .focusEffectDisabled(true)
-        }
+                        .fill(isFocused ? EmberTheme.primary : Color.white.opacity(0.1))
+                    
+                    if isFocused {
+                        Capsule()
+                            .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                            .blur(radius: 1)
+                    }
+                }
+            )
+            .foregroundColor(isFocused ? .white : .white.opacity(0.8))
+            .scaleEffect(isFocused ? 1.05 : 1.0)
+            .shadow(
+                color: isFocused ? EmberTheme.primary.opacity(0.4) : .clear,
+                radius: 20, x: 0, y: 10
+            )
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isFocused)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+            .focusEffectDisabled(true)
     }
 }

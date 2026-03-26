@@ -8,7 +8,6 @@ struct RentalDetailView: View {
     private var film: RentalFilmSummary { rental.film }
 
     // MARK: - Resume logic
-
     private var resumeSeconds: TimeInterval? {
         PlaybackProgressStore.progress(for: film.id)
     }
@@ -18,14 +17,14 @@ struct RentalDetailView: View {
         return TimeInterval(minutes * 60)
     }
 
-    private var watchedPercent: Int? {
+    private var watchedPercent: Double? {
         guard
             let resume = resumeSeconds,
             let total = totalDurationSeconds,
             total > 0
         else { return nil }
 
-        return Int((resume / total) * 100)
+        return resume / total
     }
 
     private var primaryButtonTitle: String {
@@ -37,112 +36,135 @@ struct RentalDetailView: View {
     }
 
     // MARK: - Body
-
     var body: some View {
         ZStack {
-            EmberTheme.background.ignoresSafeArea()
-
-            VStack(alignment: .leading, spacing: 60) {
-
-                // Logo header
-                HStack {
-                    Image("ember-tv-logo")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(height: 60)
-                        .padding(.leading, 80)
-
-                    Spacer()
+            // LAYER 1: Cinematic Blurred Background
+            GeometryReader { geo in
+                AsyncImage(url: film.posterURL) { phase in
+                    if let image = phase.image {
+                        image
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: geo.size.width, height: geo.size.height)
+                    } else {
+                        EmberTheme.background
+                    }
                 }
-                .padding(.top, 60)
+                .blur(radius: 60)
+                .overlay(
+                    Rectangle()
+                        .fill(
+                            LinearGradient(
+                                gradient: Gradient(colors: [
+                                    EmberTheme.background.opacity(0.4),
+                                    EmberTheme.background.opacity(0.95)
+                                ]),
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                )
+            }
+            .ignoresSafeArea()
 
-                // Main content
-                HStack(alignment: .top, spacing: 80) {
+            // LAYER 2: Content
+            VStack(alignment: .leading, spacing: 0) {
+                
+                // Logo header remains pinned to top-left
+                Image("ember-tv-logo")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: 50)
+                    .padding(.leading, 80)
+                    .padding(.top, 60)
 
-                    // Poster card
+                Spacer() // Pushes content down from the top
+
+                // Main Content Block (Centered horizontally and vertically)
+                HStack(alignment: .center, spacing: 80) {
+                    
+                    // Poster hero
                     RentalPosterHero(film: film)
-                        .padding(.leading, 80)
+                        .shadow(color: .black.opacity(0.5), radius: 40, x: 0, y: 20)
 
-                    // Details
-                    VStack(alignment: .leading, spacing: 28) {
+                    // Details block
+                    VStack(alignment: .leading, spacing: 32) {
                         Text(film.title)
-                            .font(EmberTheme.titleFont(48))
+                            .font(EmberTheme.titleFont(72))
                             .foregroundColor(.white)
                             .lineLimit(2)
-                            .multilineTextAlignment(.leading)
 
-                        HStack(spacing: 20) {
-                            if let minutes = film.durationMinutes {
-                                Label("\(minutes) min", systemImage: "clock")
-                                    .font(EmberTheme.bodyFont(22))
-                                    .foregroundColor(EmberTheme.textSecondary)
-                            }
-
+                        HStack(spacing: 24) {
                             if let genre = film.genre, !genre.isEmpty {
-                                Text(genre)
-                                    .font(EmberTheme.bodyFont(20))
-                                    .foregroundColor(.white)
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 6)
-                                    .background(
-                                        Capsule()
-                                            .fill(Color.white.opacity(0.08))
-                                    )
+                                Text(genre.uppercased())
+                                    .font(EmberTheme.bodySemibold(20))
+                                    .kerning(2)
+                                    .foregroundColor(EmberTheme.primary)
                             }
+                            
+                            if let minutes = film.durationMinutes {
+                                Text("\(minutes) MIN")
+                                    .font(EmberTheme.bodyFont(20))
+                                    .foregroundColor(.white.opacity(0.6))
+                            }
+                            
+                            Text("HD")
+                                .font(EmberTheme.captionFont(16))
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 2)
+                                .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.white.opacity(0.4), lineWidth: 1))
                         }
 
                         if let long = film.longDescription, !long.isEmpty {
-                            ScrollView {
-                                Text(long)
-                                    .font(EmberTheme.bodyFont(20))
-                                    .foregroundColor(EmberTheme.textSecondary)
-                                    .multilineTextAlignment(.leading)
-                                    .frame(maxWidth: 700, alignment: .leading)
-                            }
-                            .frame(maxHeight: 220)
+                            Text(long)
+                                .font(EmberTheme.bodyFont(24))
+                                .foregroundColor(.white.opacity(0.8))
+                                .lineSpacing(6)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
 
-                        VStack(alignment: .leading, spacing: 12) {
+                        // Actions Area
+                        VStack(alignment: .leading, spacing: 20) {
                             Button {
                                 showPlayer = true
                             } label: {
-                                HStack(spacing: 12) {
-                                    if let resume = resumeSeconds, resume > 60 {
-                                        Image(systemName: "play.fill")
-                                            .font(.system(size: 24, weight: .bold))
-                                    }
+                                HStack(spacing: 16) {
+                                    Image(systemName: primaryButtonTitle == "Resume" ? "play.fill" : "play.rectangle.fill")
                                     Text(primaryButtonTitle)
-                                        .font(EmberTheme.bodySemibold(24))
                                 }
                             }
                             .buttonStyle(EmberPrimaryPillButtonStyle())
 
-                            if let resume = resumeSeconds, resume > 60 {
-                                if let percent = watchedPercent {
-                                    Text("Resume from where you left off · about \(percent)% watched.")
-                                        .font(EmberTheme.bodyFont(20))
-                                        .foregroundColor(EmberTheme.textSecondary)
+                            // Progress & Expiration Info
+                            Group {
+                                if let percent = watchedPercent, percent > 0.05 {
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        Text("\(Int(percent * 100))% Watched")
+                                            .font(EmberTheme.captionFont(18))
+                                            .foregroundColor(EmberTheme.textSecondary)
+                                        
+                                        // Mini progress bar
+                                        ZStack(alignment: .leading) {
+                                            Capsule().fill(Color.white.opacity(0.2))
+                                                .frame(width: 300, height: 4)
+                                            Capsule().fill(EmberTheme.primary)
+                                                .frame(width: 300 * CGFloat(percent), height: 4)
+                                        }
+                                    }
                                 } else {
-                                    let minutes = Int(resume / 60)
-                                    Text("Resume from about \(minutes) minutes in.")
-                                        .font(EmberTheme.bodyFont(20))
+                                    // FIXED: Updated to 48 hours
+                                    Text("Available for 48 hour unlimited access")
+                                        .font(EmberTheme.captionFont(18))
                                         .foregroundColor(EmberTheme.textSecondary)
                                 }
-                            } else {
-                                Text("You’ll have 24 hours of access until your rental expires.")
-                                    .font(EmberTheme.bodyFont(20))
-                                    .foregroundColor(EmberTheme.textSecondary)
                             }
                         }
-
-                        Spacer()
                     }
-                    .padding(.trailing, 100)
-                    .padding(.top, 40) // nudges text block down to align with poster
-
-                    Spacer()
+                    .frame(maxWidth: 900, alignment: .leading)
                 }
+                .frame(maxWidth: .infinity, alignment: .center)
 
+                Spacer()
                 Spacer()
             }
         }
@@ -153,57 +175,34 @@ struct RentalDetailView: View {
 }
 
 // MARK: - Poster hero
-
 private struct RentalPosterHero: View {
     let film: RentalFilmSummary
-
-    private let width: CGFloat = 260
-    private let height: CGFloat = 430
+    private let width: CGFloat = 320
+    private let height: CGFloat = 480
 
     var body: some View {
-        VStack(spacing: 0) {
-            AsyncImage(url: film.posterURL) { phase in
-                switch phase {
-                case .empty:
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(Color.black.opacity(0.6))
-                        ProgressView()
-                    }
-                case .success(let image):
-                    image
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: width, height: height)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                case .failure:
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(Color.black.opacity(0.6))
-                        Image(systemName: "film")
-                            .font(.system(size: 52))
-                            .foregroundColor(.white.opacity(0.7))
-                    }
-                @unknown default:
-                    EmptyView()
+        AsyncImage(url: film.posterURL) { phase in
+            if let image = phase.image {
+                image
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                ZStack {
+                    Color.black.opacity(0.3)
+                    ProgressView()
                 }
             }
-            .frame(width: width, height: height)
-            .clipped()
         }
-        .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(Color.black.opacity(0.85))
-        )
+        .frame(width: width, height: height)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(EmberTheme.primary, lineWidth: 2)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Color.white.opacity(0.1), lineWidth: 1)
         )
     }
 }
 
 // MARK: - Primary pill button
-
 struct EmberPrimaryPillButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         EmberPrimaryPillButton(configuration: configuration)
@@ -215,22 +214,29 @@ struct EmberPrimaryPillButtonStyle: ButtonStyle {
 
         var body: some View {
             configuration.label
-                .padding(.horizontal, 36)
-                .padding(.vertical, 14)
+                .padding(.horizontal, 44)
+                .padding(.vertical, 16)
                 .background(
-                    Capsule()
-                        .fill(EmberTheme.primary)
+                    ZStack {
+                        Capsule()
+                            .fill(isFocused ? EmberTheme.primary : Color.white.opacity(0.1))
+                        
+                        if isFocused {
+                            Capsule()
+                                .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                                .blur(radius: 1)
+                        }
+                    }
                 )
-                .foregroundColor(.white)
-                .scaleEffect(isFocused || configuration.isPressed ? 1.06 : 1.0)
+                .foregroundColor(isFocused ? .white : .white.opacity(0.8))
+                .scaleEffect(isFocused ? 1.1 : 1.0)
                 .shadow(
-                    color: isFocused ? EmberTheme.primary.opacity(0.7) : .clear,
-                    radius: 16, x: 0, y: 0
+                    color: isFocused ? EmberTheme.primary.opacity(0.4) : .clear,
+                    radius: 20, x: 0, y: 10
                 )
-                .animation(.easeOut(duration: 0.18), value: isFocused)
+                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isFocused)
                 .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
                 .focusEffectDisabled(true)
         }
     }
 }
-
