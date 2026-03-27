@@ -6,7 +6,7 @@ struct MyRentalsView: View {
     
     @AppStorage("EmberAuthToken") private var authToken: String = ""
 
-    // NEW: Tracks which movie the user is currently focused on
+    // Tracks which movie the user is currently focused on
     @FocusState private var focusedRentalID: String?
 
     private let columns = [
@@ -29,26 +29,26 @@ struct MyRentalsView: View {
                                         .resizable()
                                         .scaledToFill()
                                         .frame(width: geo.size.width, height: geo.size.height)
-                                        .transition(.opacity) // Smooth crossfade
+                                        .transition(.opacity)
                                 } else {
                                     EmberTheme.background
                                 }
                             }
-                            // The .id modifier forces SwiftUI to recreate the view when the URL changes, triggering the transition
                             .id(url)
                         }
                     } else {
                         EmberTheme.background
                     }
                 }
-                .blur(radius: 80) // Heavy blur so it's just ambient color
+                // FIXED: Added opaque: true to stop the background from glowing around the screen edges
+                .blur(radius: 80, opaque: true)
                 .overlay(
                     Rectangle()
                         .fill(
                             LinearGradient(
                                 gradient: Gradient(colors: [
                                     EmberTheme.background.opacity(0.5),
-                                    EmberTheme.background.opacity(0.95) // Darker at the bottom for readability
+                                    EmberTheme.background.opacity(0.95)
                                 ]),
                                 startPoint: .top,
                                 endPoint: .bottom
@@ -56,7 +56,7 @@ struct MyRentalsView: View {
                         )
                 )
                 .ignoresSafeArea()
-                .animation(.easeInOut(duration: 0.6), value: focusedRentalID) // The crossfade speed
+                .animation(.easeInOut(duration: 0.6), value: focusedRentalID)
 
                 // MARK: - LAYER 2: UI Content
                 VStack(spacing: 0) {
@@ -128,7 +128,6 @@ struct MyRentalsView: View {
                                     }
                                     .buttonStyle(.plain)
                                     .focusEffectDisabled(true)
-                                    // NEW: Tells the Focus Engine to update our tracking variable when this card is highlighted
                                     .focused($focusedRentalID, equals: rental.film.id)
                                 }
                             }
@@ -160,7 +159,6 @@ struct MyRentalsView: View {
                     self.rentals = fetchedRentals
                     self.isLoading = false
                     
-                    // Optional: Set the background to the first movie right when they load in
                     if let first = fetchedRentals.first {
                         self.focusedRentalID = first.film.id
                     }

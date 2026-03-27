@@ -1,10 +1,3 @@
-//
-//  Untitled.swift
-//  EmberTV
-//
-//  Created by Brandon Duncan on 11/26/25.
-//
-
 import Foundation
 
 struct AuthResponse: Decodable {
@@ -36,7 +29,6 @@ struct Film: Identifiable, Decodable, Hashable {
 
 struct PaginatedFilmsResponse: Decodable {
     let data: [Film]
-    // meta if you need it
 }
 
 struct RentalFilmSummary: Decodable, Hashable {
@@ -46,28 +38,31 @@ struct RentalFilmSummary: Decodable, Hashable {
     let posterURL: URL?
     let hlsURL: URL?
 
-    // New fields (must be added to the /apiMyRentals film payload)
-    let longDescription: String?
+    // Detailed Metadata
+    let description: String?     // Short description
+    let longDescription: String? // Expanded description
     let durationMinutes: Int?
     let genre: String?
+    let rating: String?          // e.g. "PG-13", "R"
 
     enum CodingKeys: String, CodingKey {
         case id
         case slug
         case title
+        // FIXED: This now explicitly looks for the "short_description" key from your API
+        case description = "short_description"
+        case rating
+        case genre
         case posterURL = "poster_url"
         case hlsURL = "hls_url"
         case longDescription = "long_description"
         case durationMinutes = "duration_minutes"
-        case genre
     }
 }
-
 
 struct Rental: Decodable, Hashable {
     let film: RentalFilmSummary
 
-    // Optional – if/when you add them back to the API, they’ll start filling in
     let status: String?
     let purchasedAt: Date?
     let expiresAt: Date?
@@ -79,7 +74,6 @@ struct Rental: Decodable, Hashable {
         case expiresAt = "expires_at"
     }
 
-    /// Convenience so the rest of the UI can still ask for `filmID`
     var filmID: String { film.id }
 }
 
@@ -99,8 +93,8 @@ struct EntitlementResponse: Decodable {
 
 struct PlaybackResponse: Decodable {
     let hasAccess: Bool
-    let playbackURL: URL?     // legacy / fallback URL
-    let hlsURL: URL?          // new preferred HLS URL
+    let playbackURL: URL?
+    let hlsURL: URL?
     let expiresAt: Date?
 
     enum CodingKeys: String, CodingKey {
@@ -110,7 +104,6 @@ struct PlaybackResponse: Decodable {
         case expiresAt = "expires_at"
     }
 
-    /// Preferred stream URL – automatically picks HLS if available.
     var streamURL: URL? {
         hlsURL ?? playbackURL
     }
