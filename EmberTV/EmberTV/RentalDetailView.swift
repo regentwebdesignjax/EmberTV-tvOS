@@ -173,7 +173,7 @@ struct RentalDetailView: View {
             let prefix = rental.isScreening ? "Screening licence\(venue). " : ""
             return "\(prefix)Available until \(end.formattedForEmber())."
         }
-        return "This rental has ended. Rent it again at \(EmberAPIConfig.websiteDisplayName)."
+        return "This rental has ended."
     }
 }
 
