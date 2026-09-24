@@ -42,8 +42,8 @@ struct RentalPosterCard: View {
                     radius: isFocused ? 20 : 10, x: 0, y: isFocused ? 15 : 10)
 
             // Dynamic Countdown Pill
-            if let expiresAt = rental.expiresAt {
-                Text(expirationText(from: expiresAt, referenceTime: currentTime))
+            if let status = statusText(referenceTime: currentTime) {
+                Text(status)
                     .font(EmberTheme.bodySemibold(16))
                     .foregroundColor(.white)
                     .padding(.horizontal, 16)
@@ -68,8 +68,17 @@ struct RentalPosterCard: View {
         .animation(.easeOut(duration: 0.18), value: isFocused)
     }
 
-    // Updated to calculate the remaining time based on our real-time variable
-    private func expirationText(from date: Date, referenceTime: Date) -> String {
+    // Calculates the pill text from our real-time variable
+    private func statusText(referenceTime: Date) -> String? {
+        if rental.isUpcoming(at: referenceTime) {
+            if let date = rental.screening?.screeningDate {
+                return "Screening \(formattedScreeningDate(date))"
+            }
+            return "Starts \(rental.entitlement.startsAt?.formatted(date: .abbreviated, time: .shortened) ?? "soon")"
+        }
+        guard rental.entitlement.status == "active", let date = rental.expiresAt else {
+            return rental.entitlement.status == "active" ? nil : "Expired"
+        }
         let remaining = date.timeIntervalSince(referenceTime)
         guard remaining > 0 else { return "Expired" }
 
