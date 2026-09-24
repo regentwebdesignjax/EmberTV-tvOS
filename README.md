@@ -2,7 +2,10 @@
 
 SwiftUI tvOS app for Ember TV. It talks to the Ember TV web app's API v2
 (`https://app.emberstreaming.com/v2/...`, documented in `docs/API-v2.md` in the
-web app repo). Settings live in `EmberTV/EmberAPIConfig.swift`.
+web app repo).
+
+Open `EmberTV/EmberTV.xcodeproj` in Xcode. The app's code is in `EmberTV/EmberTV/`,
+and its settings are in `EmberTV/EmberTV/EmberAPIConfig.swift`.
 
 ## How it works
 
