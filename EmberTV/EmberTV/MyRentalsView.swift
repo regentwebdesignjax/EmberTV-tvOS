@@ -129,7 +129,7 @@ struct MyRentalsView: View {
                             Text("Your library is empty")
                                 .font(EmberTheme.headingFont(32))
                                 .foregroundColor(EmberTheme.textPrimary)
-                            Text("Rent films at \(EmberAPIConfig.websiteDisplayName) and they'll appear here.")
+                            Text("Rentals on your Ember TV account will appear here.")
                                 .font(EmberTheme.bodyFont(24))
                                 .foregroundColor(EmberTheme.textSecondary)
                         }
