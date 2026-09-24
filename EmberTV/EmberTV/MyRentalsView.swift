@@ -3,8 +3,9 @@ import SwiftUI
 struct MyRentalsView: View {
     @State private var rentals: [Rental] = []
     @State private var isLoading = true
-    
-    @AppStorage("EmberAuthToken") private var authToken: String = ""
+    @State private var errorMessage: String?
+
+    @EnvironmentObject private var api: EmberAPIClient
 
     // Tracks which movie the user is currently focused on
     @FocusState private var focusedRentalID: String?
@@ -19,8 +20,8 @@ struct MyRentalsView: View {
                 // MARK: - LAYER 1: Dynamic Cinematic Background
                 ZStack {
                     // Find the currently focused rental
-                    if let focusedRental = rentals.first(where: { $0.film.id == focusedRentalID }),
-                       let url = focusedRental.film.posterURL {
+                    if let focusedRental = rentals.first(where: { $0.id == focusedRentalID }),
+                       let url = focusedRental.film.backdropURL {
                         
                         GeometryReader { geo in
                             AsyncImage(url: url) { phase in
@@ -100,10 +101,24 @@ struct MyRentalsView: View {
                     .focusSection()
 
                     // Content Area
-                    if isLoading {
+                    if isLoading && rentals.isEmpty {
                         Spacer()
                         ProgressView("Loading your library...")
                             .controlSize(.large)
+                        Spacer()
+                    } else if let errorMessage, rentals.isEmpty {
+                        Spacer()
+                        VStack(spacing: 20) {
+                            Image(systemName: "wifi.exclamationmark")
+                                .font(.system(size: 80))
+                                .foregroundColor(.white.opacity(0.2))
+                            Text("Couldn't load your library")
+                                .font(EmberTheme.headingFont(32))
+                                .foregroundColor(EmberTheme.textPrimary)
+                            Text(errorMessage)
+                                .font(EmberTheme.bodyFont(24))
+                                .foregroundColor(EmberTheme.textSecondary)
+                        }
                         Spacer()
                     } else if rentals.isEmpty {
                         Spacer()
@@ -114,7 +129,7 @@ struct MyRentalsView: View {
                             Text("Your library is empty")
                                 .font(EmberTheme.headingFont(32))
                                 .foregroundColor(EmberTheme.textPrimary)
-                            Text("Rentals you purchase on the web will appear here.")
+                            Text("Rent films at \(EmberAPIConfig.websiteDisplayName) and they'll appear here.")
                                 .font(EmberTheme.bodyFont(24))
                                 .foregroundColor(EmberTheme.textSecondary)
                         }
@@ -122,13 +137,13 @@ struct MyRentalsView: View {
                     } else {
                         ScrollView {
                             LazyVGrid(columns: columns, spacing: 80) {
-                                ForEach(rentals, id: \.film.id) { rental in
+                                ForEach(rentals) { rental in
                                     NavigationLink(value: rental) {
                                         RentalPosterCard(rental: rental)
                                     }
                                     .buttonStyle(.plain)
                                     .focusEffectDisabled(true)
-                                    .focused($focusedRentalID, equals: rental.film.id)
+                                    .focused($focusedRentalID, equals: rental.id)
                                 }
                             }
                             .padding(.horizontal, 60)
@@ -153,28 +168,25 @@ struct MyRentalsView: View {
         isLoading = true
         Task {
             do {
-                let fetchedRentals = try await EmberAPIClient.shared.fetchMyRentals()
-                
-                await MainActor.run {
-                    self.rentals = fetchedRentals
-                    self.isLoading = false
-                    
-                    if let first = fetchedRentals.first {
-                        self.focusedRentalID = first.film.id
-                    }
+                let fetchedRentals = try await api.fetchLibrary()
+                self.rentals = fetchedRentals
+                self.errorMessage = nil
+                self.isLoading = false
+
+                if focusedRentalID == nil || !fetchedRentals.contains(where: { $0.id == focusedRentalID }),
+                   let first = fetchedRentals.first {
+                    self.focusedRentalID = first.id
                 }
             } catch {
-                print("Failed to fetch rentals: \(error.localizedDescription)")
-                await MainActor.run {
-                    self.isLoading = false
-                }
+                // A signed-out error has already sent the app back to the
+                // activation screen; anything else is shown here.
+                self.errorMessage = error.localizedDescription
+                self.isLoading = false
             }
         }
     }
-    
+
     private func logout() {
-        authToken = ""
-        EmberAPIClient.shared.logout()
-        print("User logged out successfully.")
+        api.signOut()
     }
 }
