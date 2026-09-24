@@ -79,12 +79,23 @@ struct PlayerView: View {
             player = newPlayer
 
             if let start = startPosition {
-                // Seek once the stream is ready; seeking earlier is unreliable.
-                for await status in item.publisher(for: \.status).values where status != .unknown {
-                    break
+                // Jump once the stream has loaded (seeking earlier is
+                // unreliable), but never wait on the seek itself: a seek far
+                // into the film that stalls used to leave a paused, black
+                // player. Issue it and start playing; the player shows its
+                // own spinner until the new position is buffered.
+                await waitUntilLoaded(item, timeout: 20)
+                if item.status == .failed {
+                    showFailure(item.error)
+                    return
                 }
                 if item.status == .readyToPlay {
-                    await newPlayer.seek(to: CMTime(seconds: start, preferredTimescale: 600))
+                    let tolerance = CMTime(seconds: 2, preferredTimescale: 600)
+                    newPlayer.seek(
+                        to: CMTime(seconds: start, preferredTimescale: 600),
+                        toleranceBefore: tolerance,
+                        toleranceAfter: tolerance
+                    ) { _ in }
                 }
             }
             newPlayer.play()
@@ -93,6 +104,21 @@ struct PlayerView: View {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    /// Waits until the stream has loaded or failed, at most `timeout` seconds.
+    private func waitUntilLoaded(_ item: AVPlayerItem, timeout: TimeInterval) async {
+        let deadline = Date().addingTimeInterval(timeout)
+        while item.status == .unknown, Date() < deadline, !Task.isCancelled {
+            try? await Task.sleep(nanoseconds: 250_000_000)
+        }
+    }
+
+    private func showFailure(_ error: Error?) {
+        player?.pause()
+        player = nil
+        errorMessage = "The film couldn't start. Check your connection and try again."
+        if let error { print("Playback failed: \(error.localizedDescription)") }
     }
 
     /// Where to start: the resume point, unless it is too early to matter or
