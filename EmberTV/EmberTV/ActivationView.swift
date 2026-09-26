@@ -41,7 +41,7 @@ struct ActivationView: View {
                         .foregroundColor(.white)
                         .lineSpacing(8)
 
-                    Text("Rent movies on the EmberTV web app and watch them instantly right here on your Apple TV.")
+                    Text("Rent movies on the Ember TV web app and watch them instantly right here on your Apple TV.")
                         .font(EmberTheme.bodyFont(24))
                         .foregroundColor(EmberTheme.textSecondary)
                         .padding(.trailing, 40)
