@@ -1,6 +1,20 @@
 import Foundation
 
 enum EmberAPIConfig {
+    #if STAGING
+    // The "Staging" build configuration (scheme "EmberTV Staging"): talks to
+    // the staging site and staging Supabase project, never to production.
+    // Rentals there are paid with Stripe test cards. Never ship this build to
+    // the App Store; store builds use the Release configuration below.
+    static let isStaging = true
+
+    static let apiBaseURL = URL(string: "https://staging--embertv.netlify.app")!
+    static let supabaseURL = URL(string: "https://tfnyowkprvmmkyckipya.supabase.co")!
+    static let supabasePublishableKey = "sb_publishable_P8c7Sb8DX51GiTuWA6GEPA_0XB-WrIu"
+    static let websiteDisplayName = "staging--embertv.netlify.app"
+    #else
+    static let isStaging = false
+
     /// The Ember TV web app. Every /v2 route lives under it, and viewers
     /// approve this TV at `<apiBaseURL>/activate`.
     static let apiBaseURL = URL(string: "https://app.emberstreaming.com")!
@@ -13,9 +27,10 @@ enum EmberAPIConfig {
     /// same one); it identifies the project, it does not grant access.
     static let supabasePublishableKey = "sb_publishable_dDyGlDF2w0gvX1bJbz_knw_xVt4U6Lp"
 
-    /// Sent as `client` on activation, playback and progress.
-    static let client = "tvos"
-
     /// Where viewers rent films. Shown on screen, so no scheme.
     static let websiteDisplayName = "app.emberstreaming.com"
+    #endif
+
+    /// Sent as `client` on activation, playback and progress.
+    static let client = "tvos"
 }
