@@ -32,3 +32,24 @@ and its settings are in `EmberTV/EmberTV/EmberAPIConfig.swift`.
 3. The TV opens My Rentals. Play a film, stop part way, and check that the web
    app's player resumes at the same point.
 4. Try a film whose rental has expired: it shows "This rental has ended".
+
+## Staging build
+
+The **EmberTV Staging** scheme builds the app against the staging environment
+(`https://staging--embertv.netlify.app` and the staging Supabase project)
+instead of production. It is a separate app, **Ember TV Staging**
+(`RegentMG.EmberTV.staging`), so it installs next to the store app, keeps its
+own sign-in, and shows a yellow **STAGING** badge on every screen.
+
+1. In Xcode, pick the **EmberTV Staging** scheme (next to the Run button) and
+   your Apple TV, then Run.
+2. Sign in with a **staging** account: the code is entered at
+   `staging--embertv.netlify.app/activate`, which asks for the staging password
+   first. Production accounts don't exist on staging.
+3. Rent on the staging site with Stripe's test card `4242 4242 4242 4242`; the
+   rental shows up in My Rentals on the TV.
+
+The addresses live in `EmberAPIConfig.swift` under `#if STAGING`; the Staging
+build configuration sets that flag. Store builds (Archive with the **EmberTV**
+scheme) use the Release configuration and always point at production. Never
+upload a Staging archive to App Store Connect.
